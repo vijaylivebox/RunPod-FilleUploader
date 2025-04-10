@@ -36,60 +36,95 @@
             font-size: 14px;
             margin-bottom: 20px;
         }
-        .admin-panel-button {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background-color: #5e35b1; /* Purple shade */
-            color: white;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+        #output-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            width: 90%;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
         }
-        .admin-panel-button:hover {
-            background-color: #4527a0; /* Darker purple on hover */
+        .output-image {
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transition: transform 0.3s;
+        }
+        .output-image:hover {
+            transform: scale(1.03);
+        }
+        .output-image img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        h2 {
+            text-align: center;
+            margin-top: 40px;
+            color: #fff;
         }
     </style>
 </head>
 <body>
-
-<a href="/admin" class="admin-panel-button">Admin Panel</a>
 
 <div id="logo">RunPod File Uploader</div>
 
 <div id="uppyDashboard"></div>
 
 <div id="note">
-    Note: All uploaded files are saved to <code>/workspace</code>.
+    Note: All uploaded files are saved to <code>/workspace/ComfyUI/input</code>.
 </div>
+
+<h2>Output Images</h2>
+<div id="output-gallery"></div>
 
 <script src="https://releases.transloadit.com/uppy/v2.9.4/uppy.min.js"></script>
 <script>
   const uppy = new Uppy.Core({
       autoProceed: false,
       restrictions: {
-          maxFileSize: null, // No limit on file size
-          allowedFileTypes: null // Allow all file types
+          maxFileSize: null,
+          allowedFileTypes: null
       }
   })
   .use(Uppy.Dashboard, {
       inline: true,
       target: '#uppyDashboard',
-      note: 'Upload files of any size and format.',
+      note: 'Upload files to ComfyUI input folder',
       proudlyDisplayPoweredByUppy: false,
       theme: 'dark',
       showProgressDetails: true
   })
   .use(Uppy.Tus, {
-      // Dynamically set the endpoint based on the current location
       endpoint: `${window.location.protocol}//${window.location.host}/files/`,
-      chunkSize: 50 * 1024 * 1024, // Set chunk size to 50MB
+      chunkSize: 50 * 1024 * 1024,
   });
 
   uppy.on('complete', (result) => {
-    console.log('Upload complete! We’ve uploaded these files:', result.successful);
+    console.log('Upload complete! We've uploaded these files:', result.successful);
+    loadOutputImages();
   });
+
+  // Function to load and display output images
+  function loadOutputImages() {
+      fetch('/output-images')
+          .then(response => response.json())
+          .then(images => {
+              const gallery = document.getElementById('output-gallery');
+              gallery.innerHTML = images.map(image => `
+                  <div class="output-image">
+                      <img src="${image.url}" alt="${image.name}" title="${image.name}">
+                  </div>
+              `).join('');
+          });
+  }
+
+  // Load output images on page load
+  loadOutputImages();
+  
+  // Refresh output images every 10 seconds
+  setInterval(loadOutputImages, 10000);
 </script>
 
 </body>
