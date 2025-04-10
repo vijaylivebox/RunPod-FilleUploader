@@ -11,7 +11,7 @@
             font-family: 'Arial', sans-serif;
             margin: 0;
             padding: 0;
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -50,6 +50,7 @@
             overflow: hidden;
             box-shadow: 0 4px 8px rgba(0,0,0,0.3);
             transition: transform 0.3s;
+            position: relative;
         }
         .output-image:hover {
             transform: scale(1.03);
@@ -64,6 +65,25 @@
             margin-top: 40px;
             color: #fff;
         }
+        #status-message {
+            color: #ff9900;
+            text-align: center;
+            margin: 10px 0;
+            font-style: italic;
+        }
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #fff;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -77,6 +97,7 @@
 </div>
 
 <h2>Output Images</h2>
+<div id="status-message">Loading output images...</div>
 <div id="output-gallery"></div>
 
 <script src="https://releases.transloadit.com/uppy/v2.9.4/uppy.min.js"></script>
@@ -103,20 +124,55 @@
 
   uppy.on('complete', (result) => {
     console.log('Upload complete! We've uploaded these files:', result.successful);
+    document.getElementById('status-message').textContent = 'Refreshing output images...';
     loadOutputImages();
   });
 
+  let loadingInProgress = false;
+  let lastImageCount = 0;
+  
   // Function to load and display output images
   function loadOutputImages() {
-      fetch('/output-images')
-          .then(response => response.json())
+      if (loadingInProgress) return;
+      
+      loadingInProgress = true;
+      const statusMessage = document.getElementById('status-message');
+      const gallery = document.getElementById('output-gallery');
+      
+      // Add timestamp to prevent caching
+      fetch(`/output-images?t=${new Date().getTime()}`)
+          .then(response => {
+              if (!response.ok) {
+                  throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+              }
+              return response.json();
+          })
           .then(images => {
-              const gallery = document.getElementById('output-gallery');
-              gallery.innerHTML = images.map(image => `
-                  <div class="output-image">
-                      <img src="${image.url}" alt="${image.name}" title="${image.name}">
-                  </div>
-              `).join('');
+              if (images.length === 0) {
+                  statusMessage.textContent = 'No output images found yet. They will appear here after processing.';
+                  gallery.innerHTML = '';
+              } else {
+                  if (images.length !== lastImageCount) {
+                      statusMessage.textContent = `Displaying ${images.length} output images`;
+                      lastImageCount = images.length;
+                  } else {
+                      statusMessage.textContent = '';
+                  }
+                  
+                  gallery.innerHTML = images.map(image => `
+                      <div class="output-image">
+                          <img src="${image.url}?t=${new Date().getTime()}" alt="${image.name}" title="${image.name}" 
+                               onerror="this.onerror=null; this.src='/output/${image.name}?nocache=${new Date().getTime()}';">
+                      </div>
+                  `).join('');
+              }
+          })
+          .catch(error => {
+              console.error('Error loading output images:', error);
+              statusMessage.textContent = `Error loading images: ${error.message}`;
+          })
+          .finally(() => {
+              loadingInProgress = false;
           });
   }
 
