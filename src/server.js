@@ -31,24 +31,52 @@ app.use('/files', createProxyMiddleware(proxyOptions));
 // Endpoint to get output images
 app.get('/output-images', (req, res) => {
     const outputDir = '/workspace/ComfyUI/output';
+    
+    // Log for debugging
+    console.log(`Checking for images in directory: ${outputDir}`);
+    
     try {
-        const files = fs.readdirSync(outputDir)
+        // Check if directory exists
+        if (!fs.existsSync(outputDir)) {
+            console.log(`Output directory does not exist. Creating: ${outputDir}`);
+            fs.mkdirSync(outputDir, { recursive: true });
+            res.json([]);
+            return;
+        }
+        
+        const files = fs.readdirSync(outputDir);
+        console.log(`Found ${files.length} files in output directory`);
+        
+        const imageFiles = files
             .filter(file => /\.(jpg|jpeg|png|gif|webp)$/i.test(file))
-            .map(file => ({
-                name: file,
-                url: `/output/${file}`,
-                time: fs.statSync(path.join(outputDir, file)).mtime.getTime()
-            }))
+            .map(file => {
+                const filePath = path.join(outputDir, file);
+                const stats = fs.statSync(filePath);
+                return {
+                    name: file,
+                    url: `/output/${file}`,
+                    time: stats.mtime.getTime(),
+                    size: stats.size
+                };
+            })
             .sort((a, b) => b.time - a.time); // Sort by newest first
-            
-        res.json(files);
+        
+        console.log(`Found ${imageFiles.length} image files to display`);
+        
+        res.json(imageFiles);
     } catch (err) {
-        res.json([]);
+        console.error(`Error accessing output directory: ${err.message}`);
+        res.status(500).json({ error: err.message });
     }
 });
 
-// Serve output images
-app.use('/output', express.static('/workspace/ComfyUI/output'));
+// Serve output images with explicit cache control
+app.use('/output', (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
+}, express.static('/workspace/ComfyUI/output'));
 
 // Start the tusd server
 const tusdBinaryPath = 'tusd';
@@ -74,6 +102,7 @@ tusd.on('close', (code) => {
 // Start the Express server
 app.listen(port, '0.0.0.0', () => {
     console.log(`Server listening at http://0.0.0.0:${port}`);
+    console.log(`Output images should be served from: /workspace/ComfyUI/output`);
 });
 
 process.on('SIGINT', () => {
