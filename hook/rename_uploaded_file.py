@@ -3,9 +3,9 @@ import os
 import sys
 
 def main(tus_id):
-    workspace_dir = '/workspace'
-    info_file_path = os.path.join(workspace_dir, f"{tus_id}.info")
-    upload_file_path = os.path.join(workspace_dir, tus_id)
+    workspace_dir = '/workspace/ComfyUI/input'
+    info_file_path = os.path.join('/workspace', f"{tus_id}.info")
+    upload_file_path = os.path.join('/workspace', tus_id)
 
     try:
         with open(info_file_path, 'r') as f:
@@ -15,6 +15,9 @@ def main(tus_id):
         print(f"Error: .info file not found or missing metadata for {tus_id}", file=sys.stderr)
         return
 
+    # Ensure the ComfyUI input directory exists
+    os.makedirs(workspace_dir, exist_ok=True)
+    
     new_file_path = os.path.join(workspace_dir, original_filename)
     try:
         os.rename(upload_file_path, new_file_path)
